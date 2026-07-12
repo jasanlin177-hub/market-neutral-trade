@@ -8,11 +8,22 @@
 「目前配對」存在 st.session_state，不再依賴 config.yaml 寫死的 pairs 清單。
 重運算（抓資料、共整合、回測、選券）都以按鈕觸發並快取，避免每次互動重跑。
 """
+import os
+
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
 import yaml
+
+# Streamlit Cloud 用 st.secrets（非 .env 檔）存機密資訊；把它轉成環境變數，
+# 讓既有的 os.environ.get("FINMIND_TOKEN") 之類的邏輯本機/雲端都能用。
+# 本機沒設 secrets.toml 時 st.secrets 會丟例外，忽略即可（改吃 .env）。
+try:
+    for _k, _v in st.secrets.items():
+        os.environ.setdefault(_k, str(_v))
+except Exception:
+    pass
 
 from backtest.engine import walk_forward_backtest
 from backtest.performance import compute_stats
