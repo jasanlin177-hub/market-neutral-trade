@@ -2,6 +2,8 @@
 import pandas as pd
 import requests
 
+from data.fetchers.http_util import get_json
+
 TWSE_OPENAPI = "https://openapi.twse.com.tw/v1"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -18,9 +20,8 @@ def get_suspension_calendar() -> pd.DataFrame:
 
     回傳欄位：stock_id, name, start_date（停券起日）, end_date（停券迄日）, reason。
     """
-    resp = requests.get(f"{TWSE_OPENAPI}/exchangeReport/BFI84U", headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    rows = resp.json()
+    rows = get_json(f"{TWSE_OPENAPI}/exchangeReport/BFI84U", params=None,
+                    source="twse-suspension", headers=HEADERS, timeout=30)
     df = pd.DataFrame(rows).rename(
         columns={"Code": "stock_id", "Name": "name", "Reason": "reason"}
     )
@@ -39,9 +40,8 @@ def get_warrant_map(as_of: pd.Timestamp = None) -> dict:
     """
     if as_of is None:
         as_of = pd.Timestamp.now().normalize()
-    resp = requests.get(f"{TWSE_OPENAPI}/opendata/t187ap37_L", headers=HEADERS, timeout=60)
-    resp.raise_for_status()
-    rows = resp.json()
+    rows = get_json(f"{TWSE_OPENAPI}/opendata/t187ap37_L", params=None,
+                    source="twse-warrant-map", headers=HEADERS, timeout=60)
 
     agg = {}
     for w in rows:
@@ -76,9 +76,8 @@ def get_warrant_details(underlying_name: str, as_of: pd.Timestamp = None) -> pd.
     """
     if as_of is None:
         as_of = pd.Timestamp.now().normalize()
-    resp = requests.get(f"{TWSE_OPENAPI}/opendata/t187ap37_L", headers=HEADERS, timeout=60)
-    resp.raise_for_status()
-    rows = resp.json()
+    rows = get_json(f"{TWSE_OPENAPI}/opendata/t187ap37_L", params=None,
+                    source="twse-warrant-details", headers=HEADERS, timeout=60)
 
     def _to_float(s):
         try:
@@ -122,9 +121,8 @@ def get_shareholder_meetings() -> pd.DataFrame:
     回傳欄位：stock_id, name, meeting_date（股東會日期）,
     transfer_stop_start（停止過戶起日）。用於比預告表更早看到股東會回補時點。
     """
-    resp = requests.get(f"{TWSE_OPENAPI}/opendata/t187ap38_L", headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    rows = resp.json()
+    rows = get_json(f"{TWSE_OPENAPI}/opendata/t187ap38_L", params=None,
+                    source="twse-shareholder-meeting", headers=HEADERS, timeout=30)
     df = pd.DataFrame(rows).rename(
         columns={
             "公司代號": "stock_id",

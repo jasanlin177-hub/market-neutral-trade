@@ -5,6 +5,8 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
+from data.fetchers.http_util import get_json
+
 load_dotenv()  # 從專案根目錄 .env 讀取 FINMIND_TOKEN
 
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
@@ -96,9 +98,7 @@ def get_margin_short_data(stock_id: str, start_date: str, end_date: str) -> pd.D
     if token:
         params["token"] = token
 
-    resp = requests.get(FINMIND_URL, params=params, timeout=30)
-    resp.raise_for_status()
-    payload = resp.json()
+    payload = get_json(FINMIND_URL, params, source="finmind-margin")
     data = payload.get("data", [])
     if not data:
         raise ValueError(

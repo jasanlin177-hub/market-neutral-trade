@@ -14,6 +14,7 @@ import pandas as pd
 import requests
 
 from data.fetchers.finmind_client import FINMIND_URL
+from data.fetchers.http_util import get_json
 from data.fetchers.twse_client import get_suspension_calendar
 
 
@@ -35,9 +36,7 @@ def get_dividend_events(stock_id: str, start_date: str, end_date: str) -> list:
     }
     if token:
         params["token"] = token
-    resp = requests.get(FINMIND_URL, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json().get("data", [])
+    data = get_json(FINMIND_URL, params, source="finmind-dividend").get("data", [])
 
     events = []
     for row in data:
