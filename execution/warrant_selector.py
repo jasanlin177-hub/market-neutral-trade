@@ -54,7 +54,10 @@ def _fetch_warrant_price_volume(warrant_id: str, start: str, end: str, lookback:
             f"請稍後再試或減少同時篩選的權證數量。"
         )
     resp.raise_for_status()
-    data = resp.json().get("data", [])
+    try:
+        data = resp.json().get("data", [])
+    except (ValueError, requests.exceptions.JSONDecodeError):
+        return float("nan"), 0.0  # 非 JSON（限流/封鎖）視為該檔查無資料，跳過
     if not data:
         return float("nan"), 0.0
     df = pd.DataFrame(data).sort_values("date")

@@ -115,9 +115,7 @@ def resolve_stock(query: str) -> dict:
     params = {"dataset": "TaiwanStockInfo"}
     if token:
         params["token"] = token
-    resp = requests.get(FINMIND_URL, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json().get("data", [])
+    data = get_json(FINMIND_URL, params, source="finmind-stockinfo").get("data", [])
 
     by_id = [r for r in data if r["stock_id"] == query]
     if by_id:

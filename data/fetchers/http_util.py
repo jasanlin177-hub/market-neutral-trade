@@ -30,7 +30,7 @@ def get_json(url: str, params: dict, source: str, timeout: int = 30, headers: di
     resp.raise_for_status()
     try:
         return resp.json()
-    except ValueError:
+    except (ValueError, requests.exceptions.JSONDecodeError):
         snippet = resp.text[:200].replace("\n", " ")
         print(f"[http_util] 非 JSON 回應 source={source} host={host} "
               f"http={resp.status_code} body[:200]={snippet!r}", file=sys.stderr)
