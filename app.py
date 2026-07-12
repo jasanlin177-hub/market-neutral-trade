@@ -9,6 +9,8 @@
 重運算（抓資料、共整合、回測、選券）都以按鈕觸發並快取，避免每次互動重跑。
 """
 import os
+import re
+import sys
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -48,6 +50,11 @@ def data_date_caption(prices) -> str:
     return f"📅 資料日期：{d} 收盤價（FinMind 日 K，**非即時報價**，僅供盤後規劃/監控）"
 
 
+def _redact_token(text: str) -> str:
+    """把 URL 裡的 token=xxx 遮掉，即使印到只有你自己看得到的伺服器端 log 也不留明文。"""
+    return re.sub(r"(token=)[^&\s]+", r"\1***REDACTED***", text)
+
+
 def show_data_error(e: Exception):
     """顯示乾淨的錯誤訊息，絕不輸出可能含 token 的原始 traceback / URL。
 
@@ -55,9 +62,12 @@ def show_data_error(e: Exception):
     - 網路/HTTP 例外：只顯示通用「連線失敗」訊息（原始訊息含 token）。
     - ValueError：我們自己拋的、訊息安全（如查無股票），可直接顯示。
     - 其他：只顯示例外類型名稱，不顯示可能含敏感資訊的完整訊息。
+    完整（token 已遮蔽）的錯誤內容會印到伺服器端 log（stderr），
+    只有你自己在 Streamlit Cloud 的「Manage app → Logs」看得到，方便診斷。
     """
     if type(e).__name__ in ("StopException", "RerunException", "RerunData"):
         raise e
+    print(f"[show_data_error] {type(e).__name__}: {_redact_token(str(e))}", file=sys.stderr)
     if isinstance(e, _NETWORK_EXCEPTIONS):
         st.error("資料源連線失敗，請稍後再試。（網路或資料源 API 暫時無法連線）")
     elif isinstance(e, ValueError):
