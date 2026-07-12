@@ -1,0 +1,9 @@
+pandas
+numpy
+statsmodels
+requests
+pyyaml
+python-dotenv
+apscheduler
+streamlit
+plotly

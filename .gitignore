@@ -1,0 +1,18 @@
+# 機密資訊：FinMind token、Telegram token 都在這裡，絕不能上傳
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 掃描/回測產出的中間結果（可重新產生，不需要版控）
+*.csv
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db

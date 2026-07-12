@@ -1,0 +1,103 @@
+# 配對交易 MVP 設定
+# pairs: 要檢定的股票配對清單，每組需同產業。stock_id 請填 TWSE/TPEX 股票代碼（如 "2330"）
+pairs:
+  - name: "ASIA_OPTICAL_x_TECHMAN"
+    stock_a:
+      id: "3019"      # 亞光（光電業，已由 FinMind TaiwanStockInfo 驗證）
+      name: "亞光"
+    stock_b:
+      id: "4585"      # 達明（其他電子業，已由 FinMind TaiwanStockInfo 驗證）
+      name: "達明"
+
+data:
+  dataset: "TaiwanStockPrice"   # FinMind dataset 名稱
+  start_date: "2024-01-01"
+  end_date: "today"   # "today" = 自動抓當天日期（避免寫死導致資料停在過去某日）；也可填固定日期如 "2026-07-05"
+
+# 批次掃描：同產業股票池，兩兩組合找共整合配對（可設多組股票池）
+scans:
+  - name: "OPTICAL"
+    start_date: "2022-07-01"   # 掃描用較長歷史（成熟股票不受掛牌日限制）
+    universe:
+      - { id: "3008", name: "大立光" }
+      - { id: "3406", name: "玉晶光" }
+      - { id: "3019", name: "亞光" }
+      - { id: "3504", name: "揚明光" }
+      - { id: "6209", name: "今國光" }
+      - { id: "4976", name: "佳凌" }
+  - name: "FINANCIAL_HOLDING"
+    start_date: "2022-07-01"
+    universe:
+      - { id: "2881", name: "富邦金" }
+      - { id: "2882", name: "國泰金" }
+      - { id: "2884", name: "玉山金" }
+      - { id: "2885", name: "元大金" }
+      - { id: "2886", name: "兆豐金" }
+      - { id: "2891", name: "中信金" }
+      - { id: "2892", name: "第一金" }
+      - { id: "5880", name: "合庫金" }
+
+cointegration:
+  significance_level: 0.05   # p-value 低於此值視為通過共整合檢定
+  use_log_prices: true       # 用對數價格做檢定
+  rolling:
+    enabled: true
+    window: 120              # 滾動窗口長度（交易日）
+    step: 5                  # 每隔幾個交易日滾動一次
+
+risk:
+  capital: 1000000           # 配對總資金（新台幣）
+  lot_size: 1000             # 交易單位（整張 1000 股；零股填 1）
+  max_net_exposure_pct: 0.1  # 淨曝險超過資金 10% 即擋下（BLOCK）
+  stop_loss:
+    lookback: 60             # z-score 回看天數
+    stop_z: 3.0              # |z| 超過此值觸發停損（BLOCK）
+  squeeze:                   # 軋空預警（針對放空腳）
+    surge_days: 3
+    surge_multiplier: 3.0    # 融券餘額 N 天內增為此倍數即警示
+    ratio_threshold: 0.3     # 券資比門檻
+    utilization_threshold: 0.8  # 融券使用率門檻（BLOCK：快沒券可空）
+  cointegration_gate: true   # 配對未通過共整合檢定即擋下（BLOCK）
+  buyin_calendar:            # 放空腳強制回補日曆
+    lookahead_days: 90       # 往前看幾天內的除權息
+    buyin_offset_bdays: 6    # 估算最後回補日 = 除權息交易日往前推 N 個營業日（估算，以公告為準）
+    warning_days: 10         # 距離估算最後回補日不足 N 天即擋下（BLOCK）
+  margin_monitor:            # 保證金維持率（成數與門檻以券商公告為準）
+    financing_pct: 0.6       # 融資成數（上市 60%）
+    short_margin_pct: 0.9    # 融券保證金成數（90%）
+    call_threshold: 1.3      # 整戶擔保維持率追繳門檻（130%）
+    min_short_buffer: 0.3    # 空方腳距離追繳的最低安全漲幅緩衝（30%，低於即警示）
+
+notification:
+  daily_run_at: "20:00"      # 每個交易日執行時間（融資融券餘額盤後晚間才公布，勿設太早）
+  alerts_only: false         # true = 只推播有 BLOCK/WARN 的配對；false = 每天推完整報告
+
+execution:
+  cost:                      # 費率預設值（實際以券商/主管機關公告為準）
+    fee_rate: 0.001425       # 股票手續費率（買賣各收）
+    fee_discount: 0.28       # 手續費折讓（如 2.8 折；無折讓填 1.0）
+    stock_tax_rate: 0.003    # 現股證交稅（賣出收）
+    margin_interest_rate: 0.06   # 融資年利率
+    financing_pct: 0.6       # 融資成數
+    borrow_rate: 0.0016      # 融券借券費年率
+    futures_fee_per_contract: 20 # 期貨每口手續費（元）
+    futures_tax_rate: 0.00002    # 期貨交易稅率
+    hold_days: 20            # 預估持有天數（用於估算利息/借券費）
+    warrant_tax_rate: 0.001  # 權證證交稅（賣出收，低於現股 0.3%）
+    warrant_spread_pct: 0.02 # 權證買賣價差成本估計（佔權證價比例，冷門權證更高）
+  warrant_screen:            # 選券參數（execution/warrant_selector）
+    min_avg_volume: 100      # 日均量下限（張）
+    min_days_to_expiry: 30   # 距到期最少天數
+    moneyness_low: 0.75      # 現價/履約價 下限
+    moneyness_high: 1.20     # 現價/履約價 上限
+    max_implied_vol: 1.20    # 隱含波動率上限
+
+backtest:
+  mode: "walk_forward"       # walk_forward（無前視，建議）或 simple（全樣本 hedge ratio，會高估）
+  estimation_window: 120     # walk-forward 估 hedge_ratio 用的過去天數
+  reestimate_every: 20       # 每隔幾天重估一次 hedge_ratio
+  lookback: 60               # z-score 滾動窗口
+  entry_z: 2.0               # |z| 超過此值進場
+  exit_z: 0.5               # |z| 回到此值內出場
+  stop_z: 3.0               # |z| 超過此值強制停損
+  cost_per_turn: 0.002       # 每次換倉的來回交易成本（報酬率，約當損益兩平點）
