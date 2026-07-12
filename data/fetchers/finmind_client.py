@@ -38,7 +38,20 @@ def get_stock_price(stock_id: str, dataset: str, start_date: str, end_date: str)
 
     resp = requests.get(FINMIND_URL, params=params, timeout=30)
     resp.raise_for_status()
-    payload = resp.json()
+    try:
+        payload = resp.json()
+    except ValueError:
+        # FinMind 回傳非 JSON（多半是限流/IP 封鎖時的空內容或 HTML），
+        # 印出診斷到伺服器端 log（有無 token、HTTP 狀態、回應前 200 字），方便排查。
+        import sys
+        snippet = resp.text[:200].replace("\n", " ")
+        print(f"[finmind] 非 JSON 回應 stock={stock_id} has_token={bool(token)} "
+              f"http={resp.status_code} body[:200]={snippet!r}", file=sys.stderr)
+        raise RuntimeError(
+            f"FinMind API 回傳非 JSON 內容（HTTP {resp.status_code}）。"
+            f"{'（目前無 FINMIND_TOKEN，可能走公開額度被限流）' if not token else ''}"
+            f"常見於雲端共用 IP 被資料源限流。"
+        )
 
     status = payload.get("status")
     if status == 402 or "token" in str(payload.get("msg", "")).lower():

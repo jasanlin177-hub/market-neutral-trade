@@ -26,6 +26,9 @@ try:
         os.environ.setdefault(_k, str(_v))
 except Exception:
     pass
+# 診斷（只印「有沒有」，絕不印 token 值）：確認 secrets 是否成功注入
+print(f"[startup] FINMIND_TOKEN loaded={bool(os.environ.get('FINMIND_TOKEN'))}",
+      file=sys.stderr)
 
 from backtest.engine import walk_forward_backtest
 from backtest.performance import compute_stats
