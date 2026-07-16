@@ -39,7 +39,7 @@ def _ols_hedge_ratio(y: pd.Series, x: pd.Series) -> float:
 
 
 def _generate_positions(z: pd.Series, entry_z: float, exit_z: float, stop_z: float,
-                        direction: str = "both") -> pd.Series:
+                        direction: str = "both", valid_mask: pd.Series = None) -> pd.Series:
     """依 z-score 逐日推進部位狀態（帶狀態機：進場後續抱到出場/停損）。
 
     direction：
@@ -50,6 +50,9 @@ def _generate_positions(z: pd.Series, entry_z: float, exit_z: float, stop_z: flo
     出場採「方向性」判斷（正確處理 exit_z=0 = 回到均值才出）：
       多方部位(+1，進場時 z 很負)：z 回升至 >= -exit_z 出場；z 再跌破 -stop_z 停損
       空方部位(-1，進場時 z 很正)：z 回落至 <= +exit_z 出場；z 再升破 +stop_z 停損
+
+    valid_mask：可選的布林序列，False 表示該日 spread 結構不可信
+    （如 hedge_ratio ≤ 0），強制不進場、已持倉則平倉。
     """
     allow_long = direction in ("both", "long_only")
     allow_short = direction in ("both", "short_only")
@@ -57,6 +60,11 @@ def _generate_positions(z: pd.Series, entry_z: float, exit_z: float, stop_z: flo
     current = 0.0
     for i, zi in enumerate(z):
         if np.isnan(zi):
+            pos.iloc[i] = 0.0
+            continue
+        # spread 結構不可信（如 hedge_ratio ≤ 0）：強制平倉且不進場
+        if valid_mask is not None and not bool(valid_mask.iloc[i]):
+            current = 0.0
             pos.iloc[i] = 0.0
             continue
         if current == 0.0:
@@ -91,7 +99,11 @@ def run_backtest(
 ) -> BacktestResult:
     spread = spread_series(log_price_a, log_price_b, hedge_ratio)
     z = rolling_zscore(spread, lookback)
-    pos = _generate_positions(z, entry_z, exit_z, stop_z, direction)
+    # hedge_ratio ≤ 0：spread 結構退化，方向判讀無意義，整段不交易
+    if hedge_ratio <= 0:
+        pos = pd.Series(0.0, index=z.index)
+    else:
+        pos = _generate_positions(z, entry_z, exit_z, stop_z, direction)
 
     d_spread = spread.diff()
     gross_ret = pos.shift(1) * d_spread          # 前一日部位 * 當日價差變動
@@ -177,7 +189,10 @@ def walk_forward_backtest(
 
     spread = log_price_a - hr_series * log_price_b
     z = rolling_zscore(spread, lookback)
-    pos = _generate_positions(z, entry_z, exit_z, stop_z, direction)
+    # 只在 hedge_ratio > 0 的窗口交易：hr ≤ 0 時 spread 結構退化、方向判讀無意義，
+    # 那些日子強制不進場、已持倉則平倉（用 valid_mask 傳入狀態機）。
+    valid_mask = hr_series > 0
+    pos = _generate_positions(z, entry_z, exit_z, stop_z, direction, valid_mask=valid_mask)
 
     ret_a = log_price_a.diff()
     ret_b = log_price_b.diff()
