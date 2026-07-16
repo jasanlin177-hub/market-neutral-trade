@@ -290,7 +290,22 @@ with tab_signal:
         latest_z = z.iloc[-1]
 
         st.markdown("#### 📌 進場建議")
-        if pd.isna(latest_z):
+        if coint.hedge_ratio <= 0:
+            # hedge_ratio ≤ 0 時 spread = log(A) - hr*log(B) 退化：
+            # B 上漲不再壓低 spread（甚至同向推高），「z 高=A相對貴」這個
+            # 經濟意義不成立，z 可能只是兩邊剛好同向暴衝，不是誰貴誰便宜。
+            # 這種情況不給方向建議，直接示警，避免機械套用規則反而誤導。
+            st.error(
+                f"⚠️ **hedge ratio 為負（{coint.hedge_ratio:.4f}），spread 結構退化，"
+                f"不提供方向建議**\n\n"
+                f"正常配對交易需要 hedge ratio > 0（B 漲則壓低 spread，"
+                f"代表 A 相對變便宜）。hedge ratio ≤ 0 時，{nb} 上漲反而會**推高**"
+                f"spread，此時 z 偏高很可能只是兩檔剛好同向大漲/大跌，"
+                f"不代表「{na} 相對{nb}貴」。"
+                f"{'共整合本身也未通過，' if not coint.is_cointegrated else ''}"
+                f"這組配對的統計基礎不可信，不建議依 z-score 交易。"
+            )
+        elif pd.isna(latest_z):
             st.info("z-score 尚無足夠資料（滾動窗口未滿），暫無建議。")
         elif latest_z <= -entry_z:
             st.success(
